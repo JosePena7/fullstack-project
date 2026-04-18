@@ -10,6 +10,7 @@ import Home from "./Pages/Home.jsx";
 import QuotePage from "./Pages/QuotePage.jsx";
 import About from "./Pages/About.jsx";
 import Services from "./Pages/Services.jsx";
+import Admin from "./Pages/Admin.jsx";
 
 
 
@@ -21,6 +22,7 @@ export const router = createBrowserRouter(
       <Route path="quote" element={<QuotePage />} />
       <Route path="about" element={<About />} />
       <Route path="services" element={<Services />} />
+      <Route path="admin" element={<Admin />} />
     </Route>
   )
 );

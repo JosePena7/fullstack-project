@@ -53,6 +53,38 @@ jwt = JWTManager(app)
 db.init_app(app)
 migrate = Migrate(app, db)
 
+
+def build_chat_reply(user_message):
+    message = (user_message or "").lower()
+
+    if any(keyword in message for keyword in ["quote", "price", "pricing", "estimate", "cost"]):
+        return (
+            "We can put together a custom quote based on your property size, service type, "
+            "and visit frequency. Use the quote form and we will follow up within 24 hours."
+        )
+
+    if any(keyword in message for keyword in ["service", "services", "mowing", "cleanup", "fertilization"]):
+        return (
+            "We currently highlight recurring mowing, fertilization, and seasonal cleanup. "
+            "If you share what kind of help you need, we can point you to the best fit."
+        )
+
+    if any(keyword in message for keyword in ["book", "schedule", "appointment", "next step"]):
+        return (
+            "The easiest next step is to request a quote. Once we review your property details, "
+            "we can recommend a plan and help you schedule service."
+        )
+
+    if any(keyword in message for keyword in ["huntsville", "alabama", "location", "area"]):
+        return (
+            "We are focused on serving homeowners in Huntsville, Alabama and nearby neighborhoods."
+        )
+
+    return (
+        "I can help with services, quotes, scheduling, and what to expect before booking. "
+        "Ask about pricing, service options, or the next step for your property."
+    )
+
 # --- Routes ---
 @app.route('/')
 def home():
@@ -122,6 +154,26 @@ def me():
     if user is None:
         return jsonify({"error": "User not found"}), 404
     return jsonify(user.serialize()), 200
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages", [])
+
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "Messages are required"}), 400
+
+    last_user_message = next(
+        (
+            message.get("content", "")
+            for message in reversed(messages)
+            if isinstance(message, dict) and message.get("role") == "user"
+        ),
+        "",
+    )
+
+    return jsonify({"reply": build_chat_reply(last_user_message)}), 200
 
 if __name__ == '__main__':
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"

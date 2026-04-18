@@ -39,7 +39,19 @@ const Chatbot = () => {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type") || "";
+      let data = {};
+
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const rawText = await response.text();
+        throw new Error(
+          response.ok
+            ? "The chatbot returned a non-JSON response. Check VITE_API_URL and the /api/chat backend route."
+            : rawText || "Chatbot unavailable"
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Chatbot unavailable");
