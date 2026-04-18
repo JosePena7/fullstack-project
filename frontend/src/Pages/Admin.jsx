@@ -2,43 +2,23 @@ import { useEffect, useState } from "react";
 import { buildApiUrl } from "../api.js";
 
 const Admin = () => {
-  const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
+  const [summary, setSummary] = useState({ registered_users: 0, active_users: 0 });
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
-  const token = localStorage.getItem("token") || "";
 
   useEffect(() => {
     const loadAdminData = async () => {
-      if (!token) {
-        setStatus("unauthorized");
-        setError("Log in through the client portal first so the admin page can load protected data.");
-        return;
-      }
-
       try {
-        const [meResponse, usersResponse] = await Promise.all([
-          fetch(buildApiUrl("/me"), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(buildApiUrl("/users"), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+        const response = await fetch(buildApiUrl("/api/admin/overview"));
+        const data = await response.json();
 
-        const meData = await meResponse.json();
-        const usersData = await usersResponse.json();
-
-        if (!meResponse.ok) {
-          throw new Error(meData.error || "Could not load your account.");
+        if (!response.ok) {
+          throw new Error(data.error || "Could not load admin overview.");
         }
 
-        if (!usersResponse.ok) {
-          throw new Error(usersData.error || "Could not load user records.");
-        }
-
-        setCurrentUser(meData);
-        setUsers(usersData);
+        setSummary(data.summary || { registered_users: 0, active_users: 0 });
+        setUsers(data.users || []);
         setStatus("ready");
       } catch (requestError) {
         setError(requestError.message || "Could not load admin data.");
@@ -47,7 +27,7 @@ const Admin = () => {
     };
 
     loadAdminData();
-  }, [token]);
+  }, []);
 
   return (
     <div className="admin-page py-5">
@@ -63,13 +43,6 @@ const Admin = () => {
 
         {status === "loading" && <p className="text-soft">Loading admin data...</p>}
 
-        {status === "unauthorized" && (
-          <div className="admin-panel">
-            <h2 className="h4 fw-bold mb-3">Sign in required</h2>
-            <p className="text-soft mb-0">{error}</p>
-          </div>
-        )}
-
         {status === "error" && (
           <div className="admin-panel">
             <h2 className="h4 fw-bold mb-3">Dashboard unavailable</h2>
@@ -80,25 +53,23 @@ const Admin = () => {
         {status === "ready" && (
           <>
             <div className="row g-4 mb-4">
-              <div className="col-md-4">
+              <div className="col-md-6 col-lg-4">
                 <div className="admin-panel h-100">
-                  <span className="admin-label">Signed in as</span>
-                  <h2 className="h4 fw-bold mt-2">{currentUser?.name}</h2>
-                  <p className="text-soft mb-0">{currentUser?.email}</p>
+                  <span className="admin-label">Dashboard access</span>
+                  <h2 className="h4 fw-bold mt-2">Hidden route</h2>
+                  <p className="text-soft mb-0">This page stays available at `/admin` without a portal sign-in.</p>
                 </div>
               </div>
-              <div className="col-md-4">
+              <div className="col-md-6 col-lg-4">
                 <div className="admin-panel h-100">
                   <span className="admin-label">Registered users</span>
-                  <h2 className="display-6 fw-bold mt-2 mb-0">{users.length}</h2>
+                  <h2 className="display-6 fw-bold mt-2 mb-0">{summary.registered_users}</h2>
                 </div>
               </div>
-              <div className="col-md-4">
+              <div className="col-md-12 col-lg-4">
                 <div className="admin-panel h-100">
                   <span className="admin-label">Active accounts</span>
-                  <h2 className="display-6 fw-bold mt-2 mb-0">
-                    {users.filter((user) => user.is_active).length}
-                  </h2>
+                  <h2 className="display-6 fw-bold mt-2 mb-0">{summary.active_users}</h2>
                 </div>
               </div>
             </div>

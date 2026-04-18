@@ -112,6 +112,20 @@ def get_users():
     users = User.query.all()
     return jsonify([u.serialize() for u in users])
 
+
+@app.route('/api/admin/overview', methods=['GET'])
+def admin_overview():
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify(
+        {
+            "summary": {
+                "registered_users": len(users),
+                "active_users": sum(1 for user in users if user.is_active),
+            },
+            "users": [user.serialize() for user in users],
+        }
+    ), 200
+
 @app.route('/users', methods=['POST'])
 def create_user():
     data = request.get_json()
