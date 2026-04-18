@@ -3,6 +3,7 @@ from flask_cors import CORS
 from models import db, EstimateRequest, User
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from openai import OpenAI
 from sqlalchemy.exc import IntegrityError
 import os
 from dotenv import load_dotenv
@@ -49,6 +50,8 @@ if not jwt_secret:
     raise RuntimeError("JWT_SECRET_KEY environment variable is not set.")
 app.config['JWT_SECRET_KEY'] = jwt_secret
 jwt = JWTManager(app)
+openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
  
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -84,6 +87,52 @@ def build_chat_reply(user_message):
         "I can help with services, quotes, scheduling, and what to expect before booking. "
         "Ask about pricing, service options, or the next step for your property."
     )
+
+
+def generate_chat_reply(messages):
+    last_user_message = next(
+        (
+            message.get("content", "")
+            for message in reversed(messages)
+            if isinstance(message, dict) and message.get("role") == "user"
+        ),
+        "",
+    )
+
+    if not openai_client:
+        return build_chat_reply(last_user_message)
+
+    try:
+        response = openai_client.responses.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-5-nano"),
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": (
+                                "You are a helpful lawn care assistant for a company serving "
+                                "Huntsville, Alabama. Keep answers brief, friendly, and focused "
+                                "on services, quotes, scheduling, and next steps."
+                            ),
+                        }
+                    ],
+                },
+                *[
+                    {
+                        "role": message.get("role", "user"),
+                        "content": [{"type": "input_text", "text": message.get("content", "")}],
+                    }
+                    for message in messages
+                    if isinstance(message, dict) and message.get("content")
+                ],
+            ],
+        )
+        return response.output_text or build_chat_reply(last_user_message)
+    except Exception:
+        app.logger.exception("OpenAI chat request failed")
+        return build_chat_reply(last_user_message)
 
 # --- Routes ---
 @app.route('/')
@@ -213,16 +262,7 @@ def chat():
     if not isinstance(messages, list) or not messages:
         return jsonify({"error": "Messages are required"}), 400
 
-    last_user_message = next(
-        (
-            message.get("content", "")
-            for message in reversed(messages)
-            if isinstance(message, dict) and message.get("role") == "user"
-        ),
-        "",
-    )
-
-    return jsonify({"reply": build_chat_reply(last_user_message)}), 200
+    return jsonify({"reply": generate_chat_reply(messages)}), 200
 
 if __name__ == '__main__':
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
