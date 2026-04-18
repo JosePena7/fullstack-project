@@ -28,7 +28,7 @@ const JumboTron = () => {
 
           <div className="col-lg-6">
             <div className="hero-copy">
-              <span className="eyebrow mb-3">Serving Michoacan Homes</span>
+              <span className="eyebrow mb-3">Serving Huntsville, Alabama</span>
               <h1 className="display-title fw-bold mb-3">
                 Lawn care that feels sharp, calm, and completely handled.
               </h1>

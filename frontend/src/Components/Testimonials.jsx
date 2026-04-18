@@ -14,7 +14,7 @@ const Testimonials = () => {
     {
       id: 2,
       name: "Maria Lopez",
-      text: "We used their services in Morelia and they transformed our overgrown yard into a masterpiece.",
+      text: "We hired them in Huntsville and they turned our overgrown yard into something we are proud to come home to.",
       stars: 5,
       image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80"
     },
