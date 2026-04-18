@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_URL } from "./api.js";
+import { buildApiUrl } from "./api.js";
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -19,7 +19,7 @@ function App() {
   const handleLogin = async () => {
     setError("");
     try {
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await fetch(buildApiUrl("/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -39,7 +39,7 @@ function App() {
   const handleRegister = async () => {
     setError("");
     try {
-      const res = await fetch(`${API_URL}/users`, {
+      const res = await fetch(buildApiUrl("/users"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: username, email, password }),
@@ -64,7 +64,7 @@ function App() {
 
     const fetchCurrentUser = async () => {
       try {
-        const res = await fetch(`${API_URL}/me`, {
+        const res = await fetch(buildApiUrl("/me"), {
           headers: { Authorization: `Bearer ${token}` },
         });
 

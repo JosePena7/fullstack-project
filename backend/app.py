@@ -11,18 +11,36 @@ load_dotenv()
 
 app = Flask(__name__)
 
-CORS(app, origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(","))
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
+CORS(app, origins=allowed_origins)
 
 # --- Database ---
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_NAME = os.getenv("DB_NAME")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+database_url = os.getenv("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+if not database_url:
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
+    db_name = os.getenv("DB_NAME")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
+
+    if all([db_user, db_password, db_name, db_host, db_port]):
+        database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    else:
+        raise RuntimeError(
+            "Database configuration is missing. Set DATABASE_URL or the DB_* variables."
+        )
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # --- JWT ---
@@ -96,6 +114,16 @@ def protected():
         return jsonify({"error": "User not found"}), 404
     return jsonify({"logged_in_as": user.name}), 200
 
+@app.route('/me', methods=['GET'])
+@jwt_required()
+def me():
+    current_user_id = int(get_jwt_identity())
+    user = db.session.get(User, current_user_id)
+    if user is None:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify(user.serialize()), 200
+
 if __name__ == '__main__':
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
-    app.run(debug=debug, port=5000)
+    port = int(os.getenv("PORT", 5000))
+    app.run(debug=debug, host="0.0.0.0", port=port)

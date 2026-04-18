@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { API_URL } from "../api.js";
+import { buildApiUrl } from "../api.js";
 
 const starterMessage = {
   role: "assistant",
@@ -31,7 +31,7 @@ const Chatbot = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/chat`, {
+      const response = await fetch(buildApiUrl("/api/chat"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

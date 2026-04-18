@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_URL } from '../api.js';
+import { buildApiUrl } from '../api.js';
 
 const EstimateForm = () => {
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ const EstimateForm = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/estimates`, {
+      const response = await fetch(buildApiUrl("/api/estimates"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
