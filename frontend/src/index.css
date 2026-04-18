@@ -572,6 +572,19 @@ img {
   box-shadow: var(--shadow-card);
 }
 
+.admin-login-shell {
+  max-width: 540px;
+}
+
+.admin-login-panel {
+  margin: 0 auto;
+}
+
+.admin-login-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
 .admin-label {
   font-size: 0.82rem;
   font-weight: 800;

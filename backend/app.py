@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from models import db, User
+from models import db, EstimateRequest, User
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy.exc import IntegrityError
@@ -114,17 +114,52 @@ def get_users():
 
 
 @app.route('/api/admin/overview', methods=['GET'])
+@jwt_required()
 def admin_overview():
     users = User.query.order_by(User.created_at.desc()).all()
+    estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
     return jsonify(
         {
             "summary": {
                 "registered_users": len(users),
                 "active_users": sum(1 for user in users if user.is_active),
+                "estimate_requests": len(estimates),
             },
             "users": [user.serialize() for user in users],
+            "estimates": [estimate.serialize() for estimate in estimates],
         }
     ), 200
+
+
+@app.route('/api/estimates', methods=['POST'])
+def create_estimate():
+    data = request.get_json(silent=True) or {}
+    full_name = data.get("fullName", "").strip()
+    email = data.get("email", "").strip()
+    address = data.get("address", "").strip()
+    service_type = data.get("serviceType", "").strip()
+    frequency = data.get("frequency", "").strip()
+    comments = data.get("comments", "").strip()
+
+    if not all([full_name, email, address, service_type, frequency]):
+        return jsonify({"error": "Full name, email, address, service type, and frequency are required."}), 400
+
+    try:
+        estimate = EstimateRequest(
+            full_name=full_name,
+            email=email,
+            address=address,
+            service_type=service_type,
+            frequency=frequency,
+            comments=comments,
+        )
+        db.session.add(estimate)
+        db.session.commit()
+        return jsonify(estimate.serialize()), 201
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Failed to save estimate request")
+        return jsonify({"error": "An internal error occurred."}), 500
 
 @app.route('/users', methods=['POST'])
 def create_user():
