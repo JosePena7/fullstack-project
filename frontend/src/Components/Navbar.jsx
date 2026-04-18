@@ -34,9 +34,6 @@ const Navbar = () => {
           </ul>
 
           <div className="d-flex align-items-center">
-            <Link className="nav-link me-3 fw-medium text-secondary" to="/app">
-              Client Portal
-            </Link>
             <Link className="btn btn-brand px-4" to="/quote">
               Get a Quote
             </Link>

@@ -28,7 +28,7 @@ const About = () => {
                 We realized that homeowners spend their most valuable time, their weekends, working in the yard instead of relaxing with their families.
               </p>
               <p className="text-secondary">
-                Our mission is simple: to provide precision lawn care across Huntsville that blends traditional hard work with modern technology. By using a data-driven approach to fertilization and a client-first portal, we make lawn maintenance completely stress-free.
+                Our mission is simple: to provide precision lawn care across Huntsville that blends traditional hard work with modern technology. By using a data-driven approach to fertilization and a simple customer experience, we make lawn maintenance completely stress-free.
               </p>
             </div>
           </div>
@@ -56,8 +56,8 @@ const About = () => {
             <div className="col-md-4">
               <div className="p-4 bg-white rounded-4 shadow-sm h-100">
                 <i className="bi bi-phone text-success fs-1 mb-3"></i>
-                <h4 className="fw-bold">Tech-Forward</h4>
-                <p className="text-muted small">Manage your billing, schedules, and quotes through our modern client portal.</p>
+                <h4 className="fw-bold">Easy Communication</h4>
+                <p className="text-muted small">Request quotes, ask questions, and stay in touch through a straightforward online experience.</p>
               </div>
             </div>
           </div>

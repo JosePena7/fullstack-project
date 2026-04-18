@@ -57,7 +57,7 @@ const Admin = () => {
                 <div className="admin-panel h-100">
                   <span className="admin-label">Dashboard access</span>
                   <h2 className="h4 fw-bold mt-2">Hidden route</h2>
-                  <p className="text-soft mb-0">This page stays available at `/admin` without a portal sign-in.</p>
+                  <p className="text-soft mb-0">This page stays available at `/admin` without showing up in the public navigation.</p>
                 </div>
               </div>
               <div className="col-md-6 col-lg-4">
