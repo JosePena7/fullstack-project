@@ -13,6 +13,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# --- CORS ---
 allowed_origins = [
     origin.strip()
     for origin in os.getenv(
@@ -42,20 +43,25 @@ if not database_url:
             "Database configuration is missing. Set DATABASE_URL or the DB_* variables."
         )
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # --- JWT ---
 jwt_secret = os.getenv("JWT_SECRET_KEY")
 if not jwt_secret:
     raise RuntimeError("JWT_SECRET_KEY environment variable is not set.")
-app.config['JWT_SECRET_KEY'] = jwt_secret
+app.config["JWT_SECRET_KEY"] = jwt_secret
 jwt = JWTManager(app)
+
+# --- OpenAI ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
- 
+
+# --- Init extensions ---
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# --- Config ---
 setup_token = os.getenv("SETUP_TOKEN")
 default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "Admin")
 default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@joseslawncare.com").strip().lower()
@@ -63,27 +69,24 @@ default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin12345!")
 required_user_columns = {"id", "name", "email", "password_hash", "is_active", "created_at", "updated_at"}
 
 
+# --- Helpers ---
 def user_schema_ready():
     inspector = inspect(db.engine)
     if not inspector.has_table(User.__tablename__):
         return False
-
-    columns = {column["name"] for column in inspector.get_columns(User.__tablename__)}
+    columns = {col["name"] for col in inspector.get_columns(User.__tablename__)}
     return required_user_columns.issubset(columns)
 
 
 def ensure_default_admin():
     if not all([default_admin_name, default_admin_email, default_admin_password]):
         return
-
     if not user_schema_ready():
         return
-
     try:
         existing_user = User.query.filter_by(email=default_admin_email).first()
         if existing_user:
             return
-
         admin_user = User(name=default_admin_name.strip(), email=default_admin_email)
         admin_user.set_password(default_admin_password)
         db.session.add(admin_user)
@@ -91,7 +94,6 @@ def ensure_default_admin():
     except SQLAlchemyError:
         db.session.rollback()
         app.logger.exception("Failed to ensure default admin")
-        raise
 
 
 def user_schema_error_response():
@@ -113,24 +115,20 @@ def build_chat_reply(user_message):
             "We can put together a custom quote based on your property size, service type, "
             "and visit frequency. Use the quote form and we will follow up within 24 hours."
         )
-
     if any(keyword in message for keyword in ["service", "services", "mowing", "grass", "hedge", "overgrown", "tree", "cleanup"]):
         return (
             "Our main service is grass cutting, and we also offer hedge trimming, overgrown yard cuts, "
             "and tree work. If you share what your yard needs, we can point you to the best fit."
         )
-
     if any(keyword in message for keyword in ["book", "schedule", "appointment", "next step"]):
         return (
             "The easiest next step is to request a quote. Once we review your property details, "
             "we can recommend a plan and help you schedule service."
         )
-
     if any(keyword in message for keyword in ["huntsville", "alabama", "location", "area"]):
         return (
             "We are focused on serving homeowners in Huntsville, Alabama and nearby neighborhoods."
         )
-
     return (
         "I can help with services, quotes, scheduling, and what to expect before booking. "
         "Ask about pricing, service options, or the next step for your property."
@@ -182,12 +180,14 @@ def generate_chat_reply(messages):
         app.logger.exception("OpenAI chat request failed")
         return build_chat_reply(last_user_message)
 
+
 # --- Routes ---
-@app.route('/')
+@app.route("/")
 def home():
     return jsonify({"message": "Backend is running."})
 
-@app.route('/login', methods=['POST'])
+
+@app.route("/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
@@ -199,8 +199,6 @@ def login():
 
     if not user_schema_ready():
         return user_schema_error_response()
-
-    ensure_default_admin()
 
     user = None
     if email:
@@ -214,40 +212,37 @@ def login():
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"access_token": access_token}), 200
 
-@app.route('/users', methods=['GET'])
+
+@app.route("/users", methods=["GET"])
 @jwt_required()
 def get_users():
     if not user_schema_ready():
         return user_schema_error_response()
-
-    ensure_default_admin()
     users = User.query.all()
     return jsonify([u.serialize() for u in users])
 
 
-@app.route('/api/admin/overview', methods=['GET'])
+@app.route("/api/admin/overview", methods=["GET"])
 @jwt_required()
 def admin_overview():
     if not user_schema_ready():
         return user_schema_error_response()
-
-    ensure_default_admin()
     users = User.query.order_by(User.created_at.desc()).all()
     estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
     return jsonify(
         {
             "summary": {
                 "registered_users": len(users),
-                "active_users": sum(1 for user in users if user.is_active),
+                "active_users": sum(1 for u in users if u.is_active),
                 "estimate_requests": len(estimates),
             },
-            "users": [user.serialize() for user in users],
-            "estimates": [estimate.serialize() for estimate in estimates],
+            "users": [u.serialize() for u in users],
+            "estimates": [e.serialize() for e in estimates],
         }
     ), 200
 
 
-@app.route('/api/estimates', methods=['POST'])
+@app.route("/api/estimates", methods=["POST"])
 def create_estimate():
     data = request.get_json(silent=True) or {}
     full_name = data.get("fullName", "").strip()
@@ -277,7 +272,8 @@ def create_estimate():
         app.logger.exception("Failed to save estimate request")
         return jsonify({"error": "An internal error occurred."}), 500
 
-@app.route('/users', methods=['POST'])
+
+@app.route("/users", methods=["POST"])
 def create_user():
     data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
@@ -293,7 +289,6 @@ def create_user():
         db.session.add(new_user)
         db.session.commit()
         return jsonify(new_user.serialize()), 201
-
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "A user with that email already exists."}), 409
@@ -302,7 +297,8 @@ def create_user():
         app.logger.exception("Failed to create user")
         return jsonify({"error": "An internal error occurred."}), 500
 
-@app.route('/protected', methods=['GET'])
+
+@app.route("/protected", methods=["GET"])
 @jwt_required()
 def protected():
     current_user_id = int(get_jwt_identity())
@@ -311,13 +307,12 @@ def protected():
         return jsonify({"error": "User not found"}), 404
     return jsonify({"logged_in_as": user.name}), 200
 
-@app.route('/me', methods=['GET'])
+
+@app.route("/me", methods=["GET"])
 @jwt_required()
 def me():
     if not user_schema_ready():
         return user_schema_error_response()
-
-    ensure_default_admin()
     current_user_id = int(get_jwt_identity())
     user = db.session.get(User, current_user_id)
     if user is None:
@@ -325,26 +320,22 @@ def me():
     return jsonify(user.serialize()), 200
 
 
-@app.route('/api/chat', methods=['POST'])
+@app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
     messages = data.get("messages", [])
-
     if not isinstance(messages, list) or not messages:
         return jsonify({"error": "Messages are required"}), 400
-
     return jsonify({"reply": generate_chat_reply(messages)}), 200
 
 
-@app.route('/setup/init-db', methods=['POST'])
+@app.route("/setup/init-db", methods=["POST"])
 def setup_init_db():
     if not setup_token:
         return jsonify({"error": "SETUP_TOKEN is not configured."}), 403
-
     provided_token = request.headers.get("X-Setup-Token", "").strip()
     if provided_token != setup_token:
         return jsonify({"error": "Invalid setup token."}), 401
-
     try:
         db.create_all()
         ensure_default_admin()
@@ -353,7 +344,13 @@ def setup_init_db():
         app.logger.exception("Failed to initialize database")
         return jsonify({"error": "Database initialization failed."}), 500
 
-if __name__ == '__main__':
+
+# --- Startup: seed default admin once ---
+with app.app_context():
+    ensure_default_admin()
+
+
+if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     port = int(os.getenv("PORT", 5000))
     app.run(debug=debug, host="0.0.0.0", port=port)
