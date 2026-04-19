@@ -7,7 +7,7 @@ const Navbar = () => {
       <div className="container">
         <Link className="navbar-brand d-flex align-items-center fw-bold text-success fs-3" to="/">
           <i className="bi bi-patch-check-fill me-2"></i>
-          <span>GRN<span className="text-dark">TKM</span></span>
+          <span>Joses Lawn Care LLC</span>
         </Link>
 
         <button className="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
