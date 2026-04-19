@@ -4,7 +4,7 @@ from models import db, EstimateRequest, User
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from openai import OpenAI
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy import inspect
 import os
 from dotenv import load_dotenv
@@ -60,24 +60,49 @@ setup_token = os.getenv("SETUP_TOKEN")
 default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "Admin")
 default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@joseslawncare.com").strip().lower()
 default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin12345!")
+required_user_columns = {"id", "name", "email", "password_hash", "is_active", "created_at", "updated_at"}
+
+
+def user_schema_ready():
+    inspector = inspect(db.engine)
+    if not inspector.has_table(User.__tablename__):
+        return False
+
+    columns = {column["name"] for column in inspector.get_columns(User.__tablename__)}
+    return required_user_columns.issubset(columns)
 
 
 def ensure_default_admin():
     if not all([default_admin_name, default_admin_email, default_admin_password]):
         return
 
-    inspector = inspect(db.engine)
-    if not inspector.has_table(User.__tablename__):
+    if not user_schema_ready():
         return
 
-    existing_user = User.query.filter_by(email=default_admin_email).first()
-    if existing_user:
-        return
+    try:
+        existing_user = User.query.filter_by(email=default_admin_email).first()
+        if existing_user:
+            return
 
-    admin_user = User(name=default_admin_name.strip(), email=default_admin_email)
-    admin_user.set_password(default_admin_password)
-    db.session.add(admin_user)
-    db.session.commit()
+        admin_user = User(name=default_admin_name.strip(), email=default_admin_email)
+        admin_user.set_password(default_admin_password)
+        db.session.add(admin_user)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.exception("Failed to ensure default admin")
+        raise
+
+
+def user_schema_error_response():
+    return jsonify(
+        {
+            "error": (
+                "The users table is missing required columns for admin login. "
+                "Run the latest backend database migration, then try again."
+            )
+        }
+    ), 503
 
 
 def build_chat_reply(user_message):
@@ -172,6 +197,9 @@ def login():
     if not password or (not email and not username):
         return jsonify({"error": "Email and password are required"}), 400
 
+    if not user_schema_ready():
+        return user_schema_error_response()
+
     ensure_default_admin()
 
     user = None
@@ -189,6 +217,9 @@ def login():
 @app.route('/users', methods=['GET'])
 @jwt_required()
 def get_users():
+    if not user_schema_ready():
+        return user_schema_error_response()
+
     ensure_default_admin()
     users = User.query.all()
     return jsonify([u.serialize() for u in users])
@@ -197,6 +228,9 @@ def get_users():
 @app.route('/api/admin/overview', methods=['GET'])
 @jwt_required()
 def admin_overview():
+    if not user_schema_ready():
+        return user_schema_error_response()
+
     ensure_default_admin()
     users = User.query.order_by(User.created_at.desc()).all()
     estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
@@ -280,6 +314,9 @@ def protected():
 @app.route('/me', methods=['GET'])
 @jwt_required()
 def me():
+    if not user_schema_ready():
+        return user_schema_error_response()
+
     ensure_default_admin()
     current_user_id = int(get_jwt_identity())
     user = db.session.get(User, current_user_id)
