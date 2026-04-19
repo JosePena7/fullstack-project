@@ -18,6 +18,7 @@ flask-migrate = "*"
 python-dotenv = "*"
 psycopg2-binary = "*"
 flask-jwt-extended = "*"
+openai = "*"
 
 [dev-packages]
 
