@@ -7,7 +7,7 @@ const EstimateForm = () => {
     fullName: '',
     email: '',
     address: '',
-    serviceType: 'Mowing',
+    serviceType: 'Grass Cutting',
     frequency: 'Weekly',
     comments: ''
   });
@@ -30,7 +30,7 @@ const EstimateForm = () => {
         // Reset form after success
         setFormData({
           fullName: '', email: '', address: '',
-          serviceType: 'Mowing', frequency: 'Weekly', comments: ''
+          serviceType: 'Grass Cutting', frequency: 'Weekly', comments: ''
         });
       } else {
         const errorData = await response.json();
@@ -111,9 +111,10 @@ const EstimateForm = () => {
                             value={formData.serviceType}
                             onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
                           >
-                            <option value="Mowing">Regular Mowing</option>
-                            <option value="Fertilization">Fertilization</option>
-                            <option value="Cleanup">Seasonal Cleanup</option>
+                            <option value="Grass Cutting">Grass Cutting</option>
+                            <option value="Hedge Trimming">Hedge Trimming</option>
+                            <option value="Overgrown Yard Cutting">Overgrown Yard Cutting</option>
+                            <option value="Tree Work">Tree Work</option>
                           </select>
                           <label htmlFor="service">Service Needed</label>
                         </div>

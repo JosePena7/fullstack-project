@@ -55,6 +55,7 @@ openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
  
 db.init_app(app)
 migrate = Migrate(app, db)
+setup_token = os.getenv("SETUP_TOKEN")
 
 
 def build_chat_reply(user_message):
@@ -66,10 +67,10 @@ def build_chat_reply(user_message):
             "and visit frequency. Use the quote form and we will follow up within 24 hours."
         )
 
-    if any(keyword in message for keyword in ["service", "services", "mowing", "cleanup", "fertilization"]):
+    if any(keyword in message for keyword in ["service", "services", "mowing", "grass", "hedge", "overgrown", "tree", "cleanup"]):
         return (
-            "We currently highlight recurring mowing, fertilization, and seasonal cleanup. "
-            "If you share what kind of help you need, we can point you to the best fit."
+            "Our main service is grass cutting, and we also offer hedge trimming, overgrown yard cuts, "
+            "and tree work. If you share what your yard needs, we can point you to the best fit."
         )
 
     if any(keyword in message for keyword in ["book", "schedule", "appointment", "next step"]):
@@ -263,6 +264,23 @@ def chat():
         return jsonify({"error": "Messages are required"}), 400
 
     return jsonify({"reply": generate_chat_reply(messages)}), 200
+
+
+@app.route('/setup/init-db', methods=['POST'])
+def setup_init_db():
+    if not setup_token:
+        return jsonify({"error": "SETUP_TOKEN is not configured."}), 403
+
+    provided_token = request.headers.get("X-Setup-Token", "").strip()
+    if provided_token != setup_token:
+        return jsonify({"error": "Invalid setup token."}), 401
+
+    try:
+        db.create_all()
+        return jsonify({"message": "Database tables initialized."}), 200
+    except Exception:
+        app.logger.exception("Failed to initialize database")
+        return jsonify({"error": "Database initialization failed."}), 500
 
 if __name__ == '__main__':
     debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
