@@ -15,7 +15,7 @@ const Admin = () => {
   const [summary, setSummary] = useState(emptySummary);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY) || "");
 
@@ -71,7 +71,7 @@ const Admin = () => {
       const response = await fetch(buildApiUrl("/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
@@ -116,16 +116,16 @@ const Admin = () => {
             <div className="admin-panel admin-login-panel">
               <h2 className="h3 fw-bold mb-3">Admin sign in</h2>
               <p className="text-soft mb-4">
-                Use your existing account credentials to unlock the hidden admin dashboard.
+                Use your admin email and password to unlock the hidden dashboard and review estimate requests.
               </p>
 
               <form className="admin-login-form" onSubmit={handleLogin}>
                 <input
                   className="form-control"
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
+                  type="email"
+                  placeholder="Admin email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                 />
                 <input

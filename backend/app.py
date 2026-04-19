@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from openai import OpenAI
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import inspect
 import os
 from dotenv import load_dotenv
 
@@ -56,6 +57,27 @@ openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
 db.init_app(app)
 migrate = Migrate(app, db)
 setup_token = os.getenv("SETUP_TOKEN")
+default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "Admin")
+default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@joseslawncare.com").strip().lower()
+default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin12345!")
+
+
+def ensure_default_admin():
+    if not all([default_admin_name, default_admin_email, default_admin_password]):
+        return
+
+    inspector = inspect(db.engine)
+    if not inspector.has_table(User.__tablename__):
+        return
+
+    existing_user = User.query.filter_by(email=default_admin_email).first()
+    if existing_user:
+        return
+
+    admin_user = User(name=default_admin_name.strip(), email=default_admin_email)
+    admin_user.set_password(default_admin_password)
+    db.session.add(admin_user)
+    db.session.commit()
 
 
 def build_chat_reply(user_message):
@@ -142,16 +164,24 @@ def home():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip().lower()
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
 
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+    if not password or (not email and not username):
+        return jsonify({"error": "Email and password are required"}), 400
 
-    user = User.query.filter_by(name=username).first()
+    ensure_default_admin()
+
+    user = None
+    if email:
+        user = User.query.filter_by(email=email).first()
+    elif username:
+        user = User.query.filter_by(name=username).first()
+
     if user is None or not user.check_password(password):
-        return jsonify({"error": "Invalid username or password"}), 401
+        return jsonify({"error": "Invalid email or password"}), 401
 
     access_token = create_access_token(identity=str(user.id))
     return jsonify({"access_token": access_token}), 200
@@ -159,6 +189,7 @@ def login():
 @app.route('/users', methods=['GET'])
 @jwt_required()
 def get_users():
+    ensure_default_admin()
     users = User.query.all()
     return jsonify([u.serialize() for u in users])
 
@@ -166,6 +197,7 @@ def get_users():
 @app.route('/api/admin/overview', methods=['GET'])
 @jwt_required()
 def admin_overview():
+    ensure_default_admin()
     users = User.query.order_by(User.created_at.desc()).all()
     estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
     return jsonify(
@@ -213,10 +245,10 @@ def create_estimate():
 
 @app.route('/users', methods=['POST'])
 def create_user():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
     password = data.get("password", "").strip()
-    email = data.get("email", "").strip()
+    email = data.get("email", "").strip().lower()
 
     if not name or not password or not email:
         return jsonify({"error": "Name, email, and password are required"}), 400
@@ -248,6 +280,7 @@ def protected():
 @app.route('/me', methods=['GET'])
 @jwt_required()
 def me():
+    ensure_default_admin()
     current_user_id = int(get_jwt_identity())
     user = db.session.get(User, current_user_id)
     if user is None:
@@ -277,6 +310,7 @@ def setup_init_db():
 
     try:
         db.create_all()
+        ensure_default_admin()
         return jsonify({"message": "Database tables initialized."}), 200
     except Exception:
         app.logger.exception("Failed to initialize database")
