@@ -400,6 +400,27 @@ img {
   border-color: rgba(45, 106, 62, 0.28) !important;
 }
 
+.estimate-notes {
+  min-height: 132px !important;
+}
+
+.estimate-feedback {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  font-weight: 600;
+}
+
+.estimate-feedback.is-success {
+  background: rgba(45, 106, 62, 0.12);
+  color: var(--brand);
+}
+
+.estimate-feedback.is-error {
+  background: rgba(160, 61, 45, 0.1);
+  color: #a33d2d;
+}
+
 .services-page {
   background: linear-gradient(180deg, rgba(244, 241, 232, 0.5), rgba(255, 255, 255, 0.3));
 }
@@ -585,6 +606,17 @@ img {
   gap: 0.9rem;
 }
 
+.admin-account-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-form-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .admin-label {
   font-size: 0.82rem;
   font-weight: 800;
@@ -610,6 +642,16 @@ img {
 .admin-status.is-inactive {
   background: rgba(160, 61, 45, 0.1);
   color: #a33d2d;
+}
+
+.admin-note {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.admin-success {
+  color: var(--brand);
+  font-weight: 600;
 }
 
 @media (max-width: 991px) {
@@ -653,5 +695,9 @@ img {
 
   .chatbot-panel {
     width: 100%;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
   }
 }

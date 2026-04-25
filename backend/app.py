@@ -63,9 +63,9 @@ migrate = Migrate(app, db)
 
 # --- Config ---
 setup_token = os.getenv("SETUP_TOKEN")
-default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "Admin")
-default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@joseslawncare.com").strip().lower()
-default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin12345!")
+default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "").strip()
+default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "").strip().lower()
+default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "").strip()
 required_user_columns = {"id", "name", "email", "password_hash", "is_active", "created_at", "updated_at"}
 missing_user_schema_message = (
     "The users table is missing required columns for admin login. "
@@ -119,6 +119,11 @@ def user_schema_error_response(error_message=missing_user_schema_message):
             "error": error_message
         }
     ), 503
+
+
+def get_current_user():
+    current_user_id = int(get_jwt_identity())
+    return db.session.get(User, current_user_id)
 
 
 def build_chat_reply(user_message):
@@ -244,6 +249,9 @@ def admin_overview():
     schema_error = get_user_schema_error()
     if schema_error:
         return user_schema_error_response(schema_error)
+    current_user = get_current_user()
+    if current_user is None:
+        return jsonify({"error": "User not found"}), 404
     users = User.query.order_by(User.created_at.desc()).all()
     estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
     return jsonify(
@@ -253,6 +261,7 @@ def admin_overview():
                 "active_users": sum(1 for u in users if u.is_active),
                 "estimate_requests": len(estimates),
             },
+            "current_user": current_user.serialize(),
             "users": [u.serialize() for u in users],
             "estimates": [e.serialize() for e in estimates],
         }
@@ -264,18 +273,20 @@ def create_estimate():
     data = request.get_json(silent=True) or {}
     full_name = data.get("fullName", "").strip()
     email = data.get("email", "").strip()
+    phone_number = data.get("phoneNumber", "").strip()
     address = data.get("address", "").strip()
     service_type = data.get("serviceType", "").strip()
     frequency = data.get("frequency", "").strip()
     comments = data.get("comments", "").strip()
 
-    if not all([full_name, email, address, service_type, frequency]):
-        return jsonify({"error": "Full name, email, address, service type, and frequency are required."}), 400
+    if not all([full_name, email, phone_number, address, service_type, frequency]):
+        return jsonify({"error": "Full name, email, phone number, address, service type, and frequency are required."}), 400
 
     try:
         estimate = EstimateRequest(
             full_name=full_name,
             email=email,
+            phone_number=phone_number,
             address=address,
             service_type=service_type,
             frequency=frequency,
@@ -331,11 +342,65 @@ def me():
     schema_error = get_user_schema_error()
     if schema_error:
         return user_schema_error_response(schema_error)
-    current_user_id = int(get_jwt_identity())
-    user = db.session.get(User, current_user_id)
+    user = get_current_user()
     if user is None:
         return jsonify({"error": "User not found"}), 404
     return jsonify(user.serialize()), 200
+
+
+@app.route("/me", methods=["PATCH"])
+@jwt_required()
+def update_me():
+    schema_error = get_user_schema_error()
+    if schema_error:
+        return user_schema_error_response(schema_error)
+
+    user = get_current_user()
+    if user is None:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    email = data.get("email")
+    password = data.get("password")
+
+    if name is None and email is None and password is None:
+        return jsonify({"error": "Provide at least one account field to update."}), 400
+
+    try:
+        if name is not None:
+            normalized_name = name.strip()
+            if not normalized_name:
+                return jsonify({"error": "Name cannot be empty."}), 400
+            user.name = normalized_name
+
+        if email is not None:
+            normalized_email = email.strip().lower()
+            if not normalized_email:
+                return jsonify({"error": "Email cannot be empty."}), 400
+            existing_user = User.query.filter_by(email=normalized_email).first()
+            if existing_user and existing_user.id != user.id:
+                return jsonify({"error": "A user with that email already exists."}), 409
+            user.email = normalized_email
+
+        if password is not None:
+            normalized_password = password.strip()
+            if not normalized_password:
+                return jsonify({"error": "Password cannot be empty."}), 400
+            user.set_password(normalized_password)
+
+        db.session.commit()
+        return jsonify(user.serialize()), 200
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "A user with that email already exists."}), 409
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Failed to update account")
+        return jsonify({"error": "An internal error occurred."}), 500
 
 
 @app.route("/api/chat", methods=["POST"])

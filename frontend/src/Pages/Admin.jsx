@@ -9,15 +9,35 @@ const emptySummary = {
   estimate_requests: 0,
 };
 
+const emptyAccountForm = {
+  name: "",
+  email: "",
+  password: "",
+};
+
 const Admin = () => {
   const [users, setUsers] = useState([]);
   const [estimates, setEstimates] = useState([]);
   const [summary, setSummary] = useState(emptySummary);
+  const [currentUser, setCurrentUser] = useState(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState(() => localStorage.getItem(ADMIN_TOKEN_KEY) || "");
+  const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [accountStatus, setAccountStatus] = useState("idle");
+  const [accountError, setAccountError] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
+
+  const hydrateAccountForm = (user) => {
+    setCurrentUser(user);
+    setAccountForm({
+      name: user?.name || "",
+      email: user?.email || "",
+      password: "",
+    });
+  };
 
   useEffect(() => {
     const loadAdminData = async () => {
@@ -26,8 +46,14 @@ const Admin = () => {
         setUsers([]);
         setEstimates([]);
         setSummary(emptySummary);
+        setCurrentUser(null);
+        setAccountForm(emptyAccountForm);
+        setAccountError("");
+        setAccountMessage("");
         return;
       }
+
+      setStatus("loading");
 
       try {
         const response = await fetch(buildApiUrl("/api/admin/overview"), {
@@ -51,6 +77,7 @@ const Admin = () => {
         setSummary(data.summary || emptySummary);
         setUsers(data.users || []);
         setEstimates(data.estimates || []);
+        hydrateAccountForm(data.current_user || null);
         setError("");
         setStatus("ready");
       } catch (requestError) {
@@ -97,6 +124,58 @@ const Admin = () => {
     setUsers([]);
     setEstimates([]);
     setSummary(emptySummary);
+    setCurrentUser(null);
+    setAccountForm(emptyAccountForm);
+    setAccountError("");
+    setAccountMessage("");
+  };
+
+  const handleAccountSubmit = async (event) => {
+    event.preventDefault();
+    setAccountStatus("saving");
+    setAccountError("");
+    setAccountMessage("");
+
+    const payload = {
+      name: accountForm.name,
+      email: accountForm.email,
+    };
+
+    if (accountForm.password.trim()) {
+      payload.password = accountForm.password;
+    }
+
+    try {
+      const response = await fetch(buildApiUrl("/me"), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not update your account.");
+      }
+
+      setCurrentUser(data);
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === data.id ? data : user))
+      );
+      setAccountForm({
+        name: data.name,
+        email: data.email,
+        password: "",
+      });
+      setAccountStatus("saved");
+      setAccountMessage("Your account settings have been updated.");
+    } catch (requestError) {
+      setAccountStatus("idle");
+      setAccountError(requestError.message || "Could not update your account.");
+    }
   };
 
   return (
@@ -106,8 +185,8 @@ const Admin = () => {
           <span className="eyebrow mb-3">Admin Dashboard</span>
           <h1 className="section-title fw-bold mb-3">Manage your Huntsville operations in one place</h1>
           <p className="text-soft mb-0">
-            Review incoming quote requests, monitor registered users, and keep the business side
-            of the site organized from one hidden route.
+            Review incoming quote requests, update your admin account, and keep the business side
+            of the site organized from one protected route.
           </p>
         </div>
 
@@ -116,7 +195,7 @@ const Admin = () => {
             <div className="admin-panel admin-login-panel">
               <h2 className="h3 fw-bold mb-3">Admin sign in</h2>
               <p className="text-soft mb-4">
-                Use your admin email and password to unlock the hidden dashboard and review estimate requests.
+                Use your admin email and password to unlock the dashboard and review estimate requests.
               </p>
 
               <form className="admin-login-form" onSubmit={handleLogin}>
@@ -185,6 +264,78 @@ const Admin = () => {
               </div>
             </div>
 
+            <div className="admin-panel mb-4">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <div>
+                  <h2 className="h4 fw-bold mb-1">Account settings</h2>
+                  <p className="text-soft mb-0">
+                    Update the admin name, email address, or password tied to this dashboard login.
+                  </p>
+                </div>
+                {currentUser ? (
+                  <span className="admin-status is-active">{currentUser.email}</span>
+                ) : null}
+              </div>
+
+              <form className="admin-account-form" onSubmit={handleAccountSubmit}>
+                <div className="admin-form-grid">
+                  <div>
+                    <label className="form-label fw-semibold" htmlFor="adminName">Display name</label>
+                    <input
+                      id="adminName"
+                      className="form-control"
+                      type="text"
+                      value={accountForm.name}
+                      onChange={(event) =>
+                        setAccountForm((currentForm) => ({ ...currentForm, name: event.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label fw-semibold" htmlFor="adminEmail">Email address</label>
+                    <input
+                      id="adminEmail"
+                      className="form-control"
+                      type="email"
+                      value={accountForm.email}
+                      onChange={(event) =>
+                        setAccountForm((currentForm) => ({ ...currentForm, email: event.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label fw-semibold" htmlFor="adminPassword">New password</label>
+                  <input
+                    id="adminPassword"
+                    className="form-control"
+                    type="password"
+                    placeholder="Leave blank to keep your current password"
+                    value={accountForm.password}
+                    onChange={(event) =>
+                      setAccountForm((currentForm) => ({ ...currentForm, password: event.target.value }))
+                    }
+                  />
+                  <p className="admin-note mb-0 mt-2">Passwords must be at least 8 characters.</p>
+                </div>
+
+                <div className="d-flex flex-column flex-sm-row align-items-sm-center gap-3">
+                  <button
+                    className="btn btn-brand"
+                    type="submit"
+                    disabled={accountStatus === "saving"}
+                  >
+                    {accountStatus === "saving" ? "Saving..." : "Save account changes"}
+                  </button>
+                  {accountMessage ? <p className="admin-success mb-0">{accountMessage}</p> : null}
+                  {accountError ? <p className="chatbot-error mb-0">{accountError}</p> : null}
+                </div>
+              </form>
+            </div>
+
             <div className="admin-panel">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                 <div>
@@ -225,7 +376,7 @@ const Admin = () => {
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                 <div>
                   <h2 className="h4 fw-bold mb-1">Incoming estimate requests</h2>
-                  <p className="text-soft mb-0">Every quote form submission will appear here once the backend migration is applied.</p>
+                  <p className="text-soft mb-0">Every quote form submission appears here with contact details for quick follow-up.</p>
                 </div>
               </div>
 
@@ -235,6 +386,7 @@ const Admin = () => {
                     <tr>
                       <th>Name</th>
                       <th>Email</th>
+                      <th>Phone</th>
                       <th>Service</th>
                       <th>Frequency</th>
                       <th>Address</th>
@@ -244,7 +396,7 @@ const Admin = () => {
                   <tbody>
                     {estimates.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-soft py-4">
+                        <td colSpan="7" className="text-soft py-4">
                           No estimate requests yet.
                         </td>
                       </tr>
@@ -258,6 +410,7 @@ const Admin = () => {
                             ) : null}
                           </td>
                           <td>{estimate.email}</td>
+                          <td>{estimate.phone_number}</td>
                           <td>{estimate.service_type}</td>
                           <td>{estimate.frequency}</td>
                           <td>{estimate.address}</td>

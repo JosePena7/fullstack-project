@@ -48,6 +48,7 @@ class EstimateRequest(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     full_name: Mapped[str] = mapped_column(db.String(120), nullable=False)
     email: Mapped[str] = mapped_column(db.String(254), nullable=False, index=True)
+    phone_number: Mapped[str] = mapped_column(db.String(40), nullable=False, default="")
     address: Mapped[str] = mapped_column(db.String(255), nullable=False)
     service_type: Mapped[str] = mapped_column(db.String(80), nullable=False)
     frequency: Mapped[str] = mapped_column(db.String(80), nullable=False)
@@ -59,6 +60,7 @@ class EstimateRequest(db.Model):
             "id": self.id,
             "full_name": self.full_name,
             "email": self.email,
+            "phone_number": self.phone_number,
             "address": self.address,
             "service_type": self.service_type,
             "frequency": self.frequency,

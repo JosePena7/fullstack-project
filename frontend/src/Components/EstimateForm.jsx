@@ -1,20 +1,29 @@
-import React, { useState } from 'react';
-import { buildApiUrl } from '../api.js';
+import { useState } from "react";
+import { buildApiUrl } from "../api.js";
+
+const initialFormData = {
+  fullName: "",
+  email: "",
+  phoneNumber: "",
+  address: "",
+  serviceType: "Grass Cutting",
+  frequency: "Weekly",
+  comments: "",
+};
 
 const EstimateForm = () => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    address: '',
-    serviceType: 'Grass Cutting',
-    frequency: 'Weekly',
-    comments: ''
-  });
+  const [formData, setFormData] = useState(initialFormData);
+  const [feedback, setFeedback] = useState({ type: "", message: "" });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const updateField = (field, value) => {
+    setFormData((currentForm) => ({ ...currentForm, [field]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLoading(true);
+    setFeedback({ type: "", message: "" });
 
     try {
       const response = await fetch(buildApiUrl("/api/estimates"), {
@@ -25,19 +34,24 @@ const EstimateForm = () => {
         body: JSON.stringify(formData),
       });
 
-      if (response.ok) {
-        alert("Success! Your estimate request has been saved.");
-        // Reset form after success
-        setFormData({
-          fullName: '', email: '', address: '',
-          serviceType: 'Grass Cutting', frequency: 'Weekly', comments: ''
-        });
-      } else {
-        const errorData = await response.json();
-        alert("Error: " + (errorData.error || "Failed to save. Check backend console."));
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save. Check backend console.");
       }
-    } catch {
-      alert("Could not connect to the server. Make sure your Flask backend is running on port 5000!");
+
+      setFeedback({
+        type: "success",
+        message: "Success! Your estimate request has been saved.",
+      });
+      setFormData(initialFormData);
+    } catch (requestError) {
+      setFeedback({
+        type: "error",
+        message:
+          requestError.message ||
+          "Could not connect to the server. Make sure your Flask backend is running on port 5000!",
+      });
     } finally {
       setLoading(false);
     }
@@ -50,8 +64,6 @@ const EstimateForm = () => {
           <div className="col-lg-8">
             <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
               <div className="row g-0">
-                
-                {/* Left Side: Branding */}
                 <div className="col-md-4 bg-success text-white p-5 d-flex flex-column justify-content-center">
                   <h3 className="fw-bold">Fast & Free</h3>
                   <p className="small opacity-75">Custom quote within 24 hours.</p>
@@ -61,20 +73,20 @@ const EstimateForm = () => {
                   </ul>
                 </div>
 
-                {/* Right Side: The Form */}
                 <div className="col-md-8 p-5">
                   <h2 className="fw-bold mb-4 text-dark">Get Your Quote</h2>
-                  
+
                   <form onSubmit={handleSubmit}>
                     <div className="row g-3">
-                      
                       <div className="col-md-6">
                         <div className="form-floating mb-3">
-                          <input 
-                            type="text" className="form-control bg-light border-0" id="fullName" 
+                          <input
+                            type="text"
+                            className="form-control bg-light border-0"
+                            id="fullName"
                             value={formData.fullName}
-                            onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                            required 
+                            onChange={(event) => updateField("fullName", event.target.value)}
+                            required
                           />
                           <label htmlFor="fullName">Full Name</label>
                         </div>
@@ -82,34 +94,69 @@ const EstimateForm = () => {
 
                       <div className="col-md-6">
                         <div className="form-floating mb-3">
-                          <input 
-                            type="email" className="form-control bg-light border-0" id="email" 
+                          <input
+                            type="email"
+                            className="form-control bg-light border-0"
+                            id="email"
                             value={formData.email}
-                            onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            required 
+                            onChange={(event) => updateField("email", event.target.value)}
+                            required
                           />
                           <label htmlFor="email">Email Address</label>
                         </div>
                       </div>
 
-                      <div className="col-12">
+                      <div className="col-md-6">
                         <div className="form-floating mb-3">
-                          <input 
-                            type="text" className="form-control bg-light border-0" id="address" 
-                            value={formData.address}
-                            onChange={(e) => setFormData({...formData, address: e.target.value})}
-                            required 
+                          <input
+                            type="tel"
+                            className="form-control bg-light border-0"
+                            id="phoneNumber"
+                            value={formData.phoneNumber}
+                            onChange={(event) => updateField("phoneNumber", event.target.value)}
+                            required
                           />
-                          <label htmlFor="address">Service Address</label>
+                          <label htmlFor="phoneNumber">Phone Number</label>
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="form-floating mb-3">
-                          <select 
-                            className="form-select bg-light border-0" id="service"
+                          <select
+                            className="form-select bg-light border-0"
+                            id="frequency"
+                            value={formData.frequency}
+                            onChange={(event) => updateField("frequency", event.target.value)}
+                          >
+                            <option value="Weekly">Weekly</option>
+                            <option value="Bi-Weekly">Bi-Weekly</option>
+                            <option value="One-Time">One-Time Only</option>
+                          </select>
+                          <label htmlFor="frequency">Frequency</label>
+                        </div>
+                      </div>
+
+                      <div className="col-12">
+                        <div className="form-floating mb-3">
+                          <input
+                            type="text"
+                            className="form-control bg-light border-0"
+                            id="address"
+                            value={formData.address}
+                            onChange={(event) => updateField("address", event.target.value)}
+                            required
+                          />
+                          <label htmlFor="address">Service Address</label>
+                        </div>
+                      </div>
+
+                      <div className="col-12">
+                        <div className="form-floating mb-3">
+                          <select
+                            className="form-select bg-light border-0"
+                            id="service"
                             value={formData.serviceType}
-                            onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
+                            onChange={(event) => updateField("serviceType", event.target.value)}
                           >
                             <option value="Grass Cutting">Grass Cutting</option>
                             <option value="Hedge Trimming">Hedge Trimming</option>
@@ -120,24 +167,34 @@ const EstimateForm = () => {
                         </div>
                       </div>
 
-                      <div className="col-md-6">
+                      <div className="col-12">
                         <div className="form-floating mb-3">
-                          <select 
-                            className="form-select bg-light border-0" id="frequency"
-                            value={formData.frequency}
-                            onChange={(e) => setFormData({...formData, frequency: e.target.value})}
-                          >
-                            <option value="Weekly">Weekly</option>
-                            <option value="Bi-Weekly">Bi-Weekly</option>
-                            <option value="One-Time">One-Time Only</option>
-                          </select>
-                          <label htmlFor="frequency">Frequency</label>
+                          <textarea
+                            className="form-control bg-light border-0 estimate-notes"
+                            id="comments"
+                            placeholder="Property details"
+                            value={formData.comments}
+                            onChange={(event) => updateField("comments", event.target.value)}
+                          ></textarea>
+                          <label htmlFor="comments">Property Notes (optional)</label>
                         </div>
                       </div>
 
-                      <div className="col-12 mt-4">
-                        <button 
-                          type="submit" 
+                      {feedback.message ? (
+                        <div className="col-12">
+                          <p
+                            className={
+                              feedback.type === "success" ? "estimate-feedback is-success" : "estimate-feedback is-error"
+                            }
+                          >
+                            {feedback.message}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      <div className="col-12 mt-2">
+                        <button
+                          type="submit"
                           className="btn btn-success btn-lg w-100 rounded-pill shadow-sm fw-bold py-3"
                           disabled={loading}
                         >
@@ -148,7 +205,6 @@ const EstimateForm = () => {
                           )}
                         </button>
                       </div>
-
                     </div>
                   </form>
                 </div>
