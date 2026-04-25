@@ -67,21 +67,38 @@ default_admin_name = os.getenv("DEFAULT_ADMIN_NAME", "Admin")
 default_admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@joseslawncare.com").strip().lower()
 default_admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD", "Admin12345!")
 required_user_columns = {"id", "name", "email", "password_hash", "is_active", "created_at", "updated_at"}
+missing_user_schema_message = (
+    "The users table is missing required columns for admin login. "
+    "Run the latest backend database migration, then try again."
+)
+database_unavailable_message = (
+    "The database is unavailable. Start PostgreSQL or check DATABASE_URL and try again."
+)
 
 
 # --- Helpers ---
-def user_schema_ready():
-    inspector = inspect(db.engine)
-    if not inspector.has_table(User.__tablename__):
-        return False
-    columns = {col["name"] for col in inspector.get_columns(User.__tablename__)}
-    return required_user_columns.issubset(columns)
+def get_user_schema_error():
+    try:
+        inspector = inspect(db.engine)
+        if not inspector.has_table(User.__tablename__):
+            return missing_user_schema_message
+
+        columns = {col["name"] for col in inspector.get_columns(User.__tablename__)}
+        if not required_user_columns.issubset(columns):
+            return missing_user_schema_message
+
+        return None
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        app.logger.warning("Database unavailable while checking user schema: %s", exc)
+        return database_unavailable_message
 
 
 def ensure_default_admin():
     if not all([default_admin_name, default_admin_email, default_admin_password]):
         return
-    if not user_schema_ready():
+    schema_error = get_user_schema_error()
+    if schema_error:
         return
     try:
         existing_user = User.query.filter_by(email=default_admin_email).first()
@@ -96,13 +113,10 @@ def ensure_default_admin():
         app.logger.exception("Failed to ensure default admin")
 
 
-def user_schema_error_response():
+def user_schema_error_response(error_message=missing_user_schema_message):
     return jsonify(
         {
-            "error": (
-                "The users table is missing required columns for admin login. "
-                "Run the latest backend database migration, then try again."
-            )
+            "error": error_message
         }
     ), 503
 
@@ -197,8 +211,9 @@ def login():
     if not password or (not email and not username):
         return jsonify({"error": "Email and password are required"}), 400
 
-    if not user_schema_ready():
-        return user_schema_error_response()
+    schema_error = get_user_schema_error()
+    if schema_error:
+        return user_schema_error_response(schema_error)
 
     user = None
     if email:
@@ -216,8 +231,9 @@ def login():
 @app.route("/users", methods=["GET"])
 @jwt_required()
 def get_users():
-    if not user_schema_ready():
-        return user_schema_error_response()
+    schema_error = get_user_schema_error()
+    if schema_error:
+        return user_schema_error_response(schema_error)
     users = User.query.all()
     return jsonify([u.serialize() for u in users])
 
@@ -225,8 +241,9 @@ def get_users():
 @app.route("/api/admin/overview", methods=["GET"])
 @jwt_required()
 def admin_overview():
-    if not user_schema_ready():
-        return user_schema_error_response()
+    schema_error = get_user_schema_error()
+    if schema_error:
+        return user_schema_error_response(schema_error)
     users = User.query.order_by(User.created_at.desc()).all()
     estimates = EstimateRequest.query.order_by(EstimateRequest.created_at.desc()).all()
     return jsonify(
@@ -311,8 +328,9 @@ def protected():
 @app.route("/me", methods=["GET"])
 @jwt_required()
 def me():
-    if not user_schema_ready():
-        return user_schema_error_response()
+    schema_error = get_user_schema_error()
+    if schema_error:
+        return user_schema_error_response(schema_error)
     current_user_id = int(get_jwt_identity())
     user = db.session.get(User, current_user_id)
     if user is None:

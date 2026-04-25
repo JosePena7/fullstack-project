@@ -1,5 +1,0 @@
-[scripts]
-start = "flask --app app run --debug"
-migrate = "flask --app app db migrate -m 'update'"
-upgrade = "flask --app app db upgrade"
-initdb = "flask --app app db init"
